@@ -44,7 +44,7 @@
 
                    :dependencies [[figwheel "0.3.7"]
                                   [figwheel-sidecar "0.3.7" :exclusions [org.codehaus.plexus/plexus-utils]]
-                                  [com.cemerick/piggieback "0.1.5"]
+                                  [com.cemerick/piggieback "0.2.1"]
                                   [weasel "0.7.0"]]
 
                    :repl-options {:init-ns manager-web.server
