@@ -7,8 +7,14 @@ pom.xml.asc
 *.class
 /.lein-*
 /.nrepl-port
-/resources/public/js
-/resources/public/css
+
+/resources/public/js/*
+!/resources/public/js/jquery
+!/resources/public/js/bootstrap
+
+/resources/public/css/*
+!/resources/public/css/bootstrap
+
 /out
 /.repl
 
