@@ -1,6 +1,8 @@
 (ns manager-web.core
   (:require [om.core :as om :include-macros true]
-            [om.dom :as dom :include-macros true]))
+            [om.dom :as dom :include-macros true]
+            [om-bootstrap.button :as btn]
+            [om-bootstrap.random :as rnd]))
 
 (enable-console-print!)
 
@@ -21,6 +23,11 @@
      (reify
        om/IRender
        (render [_]
-         (dom/h2 nil (:text app)))))
+         (dom/div nil
+                  (btn/toolbar
+                   {}
+                   (btn/button {} "Button 1")
+                   (btn/button {:bs-style "primary"} "Primary")
+                   (btn/button {:bs-style "success"} "Success"))))))
    app-state
    {:target (. js/document (getElementById "row1"))}))

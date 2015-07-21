@@ -15,7 +15,9 @@
                  [compojure "1.3.4"]
                  [enlive "1.1.6"]
                  [org.omcljs/om "0.9.0"]
-                 [environ "1.0.0"]]
+                 [racehub/om-bootstrap "0.5.0"]
+                 [environ "1.0.0"]
+                 [sablono "0.3.4"]]
 
   :plugins [[lein-cljsbuild "1.0.5"]
             [lein-environ "1.0.0"]
@@ -41,14 +43,15 @@
                    :test-paths ["test/clj"]
 
                    :dependencies [[figwheel "0.3.7"]
-                                  [figwheel-sidecar "0.3.7"]
+                                  [figwheel-sidecar "0.3.7" :exclusions [org.codehaus.plexus/plexus-utils]]
                                   [com.cemerick/piggieback "0.1.5"]
                                   [weasel "0.7.0"]]
 
                    :repl-options {:init-ns manager-web.server
                                   :nrepl-middleware [cemerick.piggieback/wrap-cljs-repl]}
 
-                   :plugins [[lein-figwheel "0.3.7"]]
+                   :plugins [[lein-figwheel "0.3.7" :exclusions [org.clojure/clojure
+                                                                 org.codehaus.plexus/plexus-utils]]]
 
                    :figwheel {:http-server-root "public"
                               :server-port 3449
