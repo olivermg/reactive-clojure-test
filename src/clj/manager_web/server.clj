@@ -1,12 +1,14 @@
 (ns manager-web.server
-  (:require [clojure.java.io :as io]
+  (:require [manager-web.db :as db]
+            [clojure.java.io :as io]
             [manager-web.dev :refer [is-dev? inject-devmode-html browser-repl start-figwheel start-less]]
-            [compojure.core :refer [GET defroutes]]
+            [compojure.core :refer [GET PUT POST defroutes]]
             [compojure.route :refer [resources]]
             [net.cgrand.enlive-html :refer [deftemplate]]
             [net.cgrand.reload :refer [auto-reload]]
             [ring.middleware.reload :as reload]
             [ring.middleware.defaults :refer [wrap-defaults site-defaults]]
+            [ring.middleware.edn :refer [wrap-edn-params]]
             [environ.core :refer [env]]
             [ring.adapter.jetty :refer [run-jetty]])
   (:gen-class))
@@ -14,15 +16,36 @@
 (deftemplate page (io/resource "index.html") []
   [:body] (if is-dev? inject-devmode-html identity))
 
+(defn generate-response [data & [status]]
+  {:status (or status 200)
+   :headers {"Content-Type" "application/edn"}
+   :body (pr-str data)})
+
+(defn services []
+  (generate-response (db/get-services)))
+
+(defn service-update [data]
+  (println (str "received update request: " data))
+  {:status 501})
+
 (defroutes routes
   (resources "/")
   (resources "/react" {:root "react"})
+  (GET "/services" [] (services))
+  (PUT "/services/:id/update"
+       {params :params}
+       (service-update params))
   (GET "/*" req (page)))
 
 (def http-handler
   (if is-dev?
-    (reload/wrap-reload (wrap-defaults #'routes site-defaults))
-    (wrap-defaults routes site-defaults)))
+    (-> routes
+        (wrap-defaults (assoc site-defaults :security false))
+        wrap-edn-params
+        reload/wrap-reload)
+    (-> routes
+        (wrap-defaults site-defaults)
+        wrap-edn-params)))
 
 (defn run-web-server [& [port]]
   (let [port (Integer. (or port (env :port) 10555))]

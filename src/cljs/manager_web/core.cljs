@@ -5,14 +5,110 @@
             [om-bootstrap.button :as btn]
             [om-bootstrap.random :as rnd]
             [om-bootstrap.grid :as grid]
-            [om-bootstrap.panel :as panel]))
+            [om-bootstrap.panel :as panel]
+            [cljs.reader :as reader]
+            [goog.events :as events])
+  (:import [goog.net XhrIo]
+           goog.net.EventType
+           [goog.events EventType]))
 
 (enable-console-print!)
 
 (defonce app-state (atom {:text "Hello Chestnut!"
                           :view {:selected :table}
                           :data [{:value 24000 :timestamp "2015-07-01"}
-                                 {:value 10000 :timestamp "2015-07-20"}]}))
+                                 {:value 10000 :timestamp "2015-07-20"}]
+                          :services []}))
+
+;;
+;; ==========================
+;;
+
+(defn display [show]
+  (if show
+    #js {}
+    #js {:display "none"}))
+
+(defn edn-xhr [{:keys [method url data on-complete]}]
+  (let [xhr (XhrIo.)]
+    (events/listen xhr goog.net.EventType.COMPLETE
+                   (fn [e]
+                     (on-complete (reader/read-string (.getResponseText xhr)))))
+    (. xhr
+       (send url method
+             (when data
+               (pr-str data))
+             #js {"Content-Type" "application/edn"}))))
+
+(defn handle-change [e data edit-key owner]
+  (om/transact! data edit-key (fn [_]
+                                .. e -target -value)))
+
+(defn end-edit [text owner cb]
+  (om/set-state! owner :editing false)
+  (cb text))
+
+(defn editable [data owner {:keys [edit-key on-edit] :as opts}]
+  (reify
+    om/IInitState
+    (init-state [_]
+      {:editing false})
+    om/IRenderState
+    (render-state [_ {:keys [editing]}]
+      (let [text (get data edit-key)]
+        (dom/li nil
+                (dom/span #js {:style (display (not editing))} text)
+                (dom/input
+                 #js {:style (display editing)
+                      :value text
+                      :onChange #(handle-change % data edit-key owner)
+                      :onKeyDown #(when (= (.-key %) "Enter")
+                                    (end-edit text owner on-edit))
+                      :onBlur (fn [e]
+                                (when (om/get-state owner :editing)
+                                  (end-edit text owner on-edit)))})
+                (dom/button
+                 #js {:style (display (not editing))
+                      :onClick #(om/set-state! owner :editing true)}
+                 "Edit"))))))
+
+(defn on-edit [id name]
+  (edn-xhr
+   {:method "PUT"
+    :url (str "services/" id "/update")
+    :data {:name name}
+    :on-complete
+    (fn [res]
+      (println "server response: " res))}))
+
+(defn services-view [app owner]
+  (reify
+    om/IWillMount
+    (will-mount [_]
+      (edn-xhr
+       {:method "GET"
+        :url "services"
+        :on-complete #(om/transact! app :services (fn [_] %))}))
+    om/IRender
+    (render [_]
+      (dom/div #js {:id "services"}
+               (dom/h2 nil "Services")
+               (apply dom/ul nil
+                      (map (fn [service]
+                             (let [id (:_id service)]
+                               (om/build editable service
+                                         {:opts {:edit-key :name
+                                                 :on-edit #(on-edit id %)}})))
+                           (:services app)))))))
+
+(om/root
+ services-view
+ app-state
+ {:target (.getElementById js/document "services")})
+
+;;
+;; =================
+;;
 
 (defn buttons []
   (dom/div nil

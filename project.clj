@@ -17,7 +17,9 @@
                  [org.omcljs/om "0.9.0"]
                  [racehub/om-bootstrap "0.5.0"]
                  [environ "1.0.0"]
-                 [sablono "0.3.4"]]
+                 [sablono "0.3.4"]
+                 [fogus/ring-edn "0.3.0"]
+                 [com.novemberain/monger "3.0.0"]]
 
   :plugins [[lein-cljsbuild "1.0.5"]
             [lein-environ "1.0.0"]
