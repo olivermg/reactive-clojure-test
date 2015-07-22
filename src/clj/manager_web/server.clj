@@ -21,20 +21,28 @@
    :headers {"Content-Type" "application/edn"}
    :body (pr-str data)})
 
+(defn init []
+  (generate-response {:services {:url "/services"
+                                 :coll (vec (db/get-services))}}))
+
 (defn services []
   (generate-response (db/get-services)))
+
+(defn service-create [params]
+  (println (str "received create request: " params))
+  {:status 501})
 
 (defn service-update [data]
   (println (str "received update request: " data))
   {:status 501})
 
 (defroutes routes
+  (GET "/init" [] (init))
+  (GET "/services" [] (services))
+  (POST "/services" {params :params} (service-create params))
+  (PUT "/services" {params :params} (service-update params))
   (resources "/")
   (resources "/react" {:root "react"})
-  (GET "/services" [] (services))
-  (PUT "/services/:id/update"
-       {params :params}
-       (service-update params))
   (GET "/*" req (page)))
 
 (defn get-dev-handler []

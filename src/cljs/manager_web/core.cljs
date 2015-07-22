@@ -1,16 +1,23 @@
 (ns manager-web.core
-  (:require [om.core :as om :include-macros true]
+  (:require-macros [cljs.core.async.macros :refer [go]])
+  (:require [cljs.core.async :as async :refer [put! chan alts!]]
+            [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
+            [om-sync.core :refer [om-sync]]
+            [om-sync.util :refer [tx-tag edn-xhr]]
             [sablono.core :as html :refer-macros [html]]
             [om-bootstrap.button :as btn]
             [om-bootstrap.random :as rnd]
             [om-bootstrap.grid :as grid]
             [om-bootstrap.panel :as panel]
-            [cljs.reader :as reader]
-            [goog.events :as events])
-  (:import [goog.net XhrIo]
-           goog.net.EventType
-           [goog.events EventType]))
+;            [cljs.reader :as reader]
+;            [goog.events :as events]
+            )
+  (:import
+;   [goog.net XhrIo]
+;   goog.net.EventType
+;   [goog.events EventType]
+   ))
 
 (enable-console-print!)
 
@@ -18,7 +25,7 @@
                           :view {:selected :table}
                           :data [{:value 24000 :timestamp "2015-07-01"}
                                  {:value 10000 :timestamp "2015-07-20"}]
-                          :services []}))
+                          :services {}}))
 
 ;;
 ;; ==========================
@@ -29,24 +36,17 @@
     #js {}
     #js {:display "none"}))
 
-(defn edn-xhr [{:keys [method url data on-complete]}]
-  (let [xhr (XhrIo.)]
-    (events/listen xhr goog.net.EventType.COMPLETE
-                   (fn [e]
-                     (on-complete (reader/read-string (.getResponseText xhr)))))
-    (. xhr
-       (send url method
-             (when data
-               (pr-str data))
-             #js {"Content-Type" "application/edn"}))))
-
 (defn handle-change [e data edit-key owner]
-  (om/transact! data edit-key (fn [_]
-                                .. e -target -value)))
+  (om/transact! data edit-key
+                (fn [_]
+                  (.. e -target -value))))
 
-(defn end-edit [text owner cb]
+(defn end-edit [data edit-key text owner cb]
   (om/set-state! owner :editing false)
-  (cb text))
+  (om/transact! data edit-key
+                (fn [_] text) :update)
+  (when cb
+    (cb text)))
 
 (defn editable [data owner {:keys [edit-key on-edit] :as opts}]
   (reify
@@ -63,48 +63,85 @@
                       :value text
                       :onChange #(handle-change % data edit-key owner)
                       :onKeyDown #(when (= (.-key %) "Enter")
-                                    (end-edit text owner on-edit))
-                      :onBlur (fn [e]
-                                (when (om/get-state owner :editing)
-                                  (end-edit text owner on-edit)))})
+                                    (end-edit data edit-key text owner on-edit))
+                      :onBlur #(when (om/get-state owner :editing)
+                                 (end-edit data edit-key text owner on-edit))})
                 (dom/button
                  #js {:style (display (not editing))
                       :onClick #(om/set-state! owner :editing true)}
                  "Edit"))))))
 
-(defn on-edit [id name]
-  (edn-xhr
-   {:method "PUT"
-    :url (str "services/" id "/update")
-    :data {:name name}
-    :on-complete
-    (fn [res]
-      (println "server response: " res))}))
+(defn create-service [services owner]
+  (let [service-id-el   (om/get-node owner "service-id")
+        service-id      (.-value service-id-el)
+        service-name-el (om/get-node owner "service-name")
+        service-name    (.-value service-name-el)
+        new-service     {:_id service-id :name service-name}]
+    (om/transact! services [] #(conj % new-service)
+                  [:create new-service])
+    (set! (.-value service-id-el) "")
+    (set! (.-value service-name-el) "")))
 
-(defn services-view [app owner]
+(defn services-view [services owner]
   (reify
-    om/IWillMount
-    (will-mount [_]
-      (edn-xhr
-       {:method "GET"
-        :url "services"
-        :on-complete #(om/transact! app :services (fn [_] %))}))
     om/IRender
     (render [_]
       (dom/div #js {:id "services"}
                (dom/h2 nil "Services")
                (apply dom/ul nil
-                      (map (fn [service]
-                             (let [id (:_id service)]
-                               (om/build editable service
-                                         {:opts {:edit-key :name
-                                                 :on-edit #(on-edit id %)}})))
-                           (:services app)))))))
+                      (map #(om/build
+                             editable %
+                             {:opts {:edit-key :name
+                                     :on-edit (fn [text]
+                                                (println (str "on edit got: " text)))}})
+                           services))
+               (dom/div nil
+                        (dom/label nil "ID:")
+                        (dom/input #js {:ref "service-id"})
+                        (dom/label nil "Name:")
+                        (dom/input #js {:ref "service-name"})
+                        (dom/button
+                         #js {:onClick (fn [e] (create-service services owner))}
+                         "Add"))))))
 
-(om/root
- services-view
- app-state
- {:target (.getElementById js/document "services")})
+(defn app-view [app owner]
+  (reify
+    om/IWillUpdate
+    (will-update [_ next-props next-state]
+      (when (:err-msg next-state)
+        (js/setTimeout #(om/set-state! owner :err-msg nil) 5000)))
+    om/IRenderState
+    (render-state [_ {:keys [err-msg]}]
+      (dom/div nil
+               (om/build om-sync (:services app)
+                         {:opts {:view services-view
+                                 :filter (comp #{:create :update :delete} tx-tag)
+                                 :id-key :_id
+                                 :on-success (fn [res tx-data] (println res))
+                                 :on-error
+                                 (fn [err tx-data]
+                                   (println (str "got error: " err))
+                                   (println (str "old state: " (:old-state tx-data)))
+                                   (reset! app-state (:old-state tx-data))
+                                   (om/set-state! owner :err-msg
+                                                  "Oops!"))}})
+               (when err-msg
+                 (dom/div nil err-msg))))))
+
+(let [tx-chan (chan)
+      tx-pub-chan (async/pub tx-chan (fn [_] :txs))]
+  (edn-xhr
+   {:method :get
+    :url "/init"
+    :on-complete
+    (fn [res]
+;      (reset! app-state res)
+      (swap! app-state #(assoc % :services (:services res)))
+      (om/root app-view app-state
+               {:target (.getElementById js/document "services")
+                :shared {:tx-chan tx-pub-chan}
+                :tx-listen (fn [tx-data root-cursor]
+                             (put! tx-chan [tx-data root-cursor]))}))}))
 
 ;;
 ;; =================
