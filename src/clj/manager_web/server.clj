@@ -37,15 +37,21 @@
        (service-update params))
   (GET "/*" req (page)))
 
+(defn get-dev-handler []
+  (-> routes
+      (wrap-defaults (assoc site-defaults :security false))
+      wrap-edn-params
+      reload/wrap-reload))
+
+(defn get-production-handler []
+  (-> routes
+      (wrap-defaults site-defaults)
+      wrap-edn-params))
+
 (def http-handler
   (if is-dev?
-    (-> routes
-        (wrap-defaults (assoc site-defaults :security false))
-        wrap-edn-params
-        reload/wrap-reload)
-    (-> routes
-        (wrap-defaults site-defaults)
-        wrap-edn-params)))
+    (get-dev-handler)
+    (get-production-handler)))
 
 (defn run-web-server [& [port]]
   (let [port (Integer. (or port (env :port) 10555))]
