@@ -10,7 +10,8 @@
             [ring.middleware.defaults :refer [wrap-defaults site-defaults]]
             [ring.middleware.edn :refer [wrap-edn-params]]
             [environ.core :refer [env]]
-            [ring.adapter.jetty :refer [run-jetty]])
+;            [ring.adapter.jetty :refer [run-jetty]]
+            [org.httpkit.server :as hk])
   (:gen-class))
 
 (deftemplate page (io/resource "index.html") []
@@ -64,7 +65,8 @@
 (defn run-web-server [& [port]]
   (let [port (Integer. (or port (env :port) 10555))]
     (println (format "Starting web server on port %d." port))
-    (run-jetty http-handler {:port port :join? false})))
+;    (run-jetty http-handler {:port port :join? false})
+    (hk/run-server http-handler {:port port})))
 
 (defn run-auto-reload [& [port]]
   (auto-reload *ns*)
