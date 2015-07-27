@@ -1,5 +1,6 @@
 (ns manager-web.server
-  (:require [manager-web.db :as db]
+  (:require [clojure.core.async :as async :refer [<! >! put! chan alts! go go-loop]]
+            [manager-web.db :as db]
             [clojure.java.io :as io]
             [manager-web.dev :refer [is-dev? inject-devmode-html browser-repl start-figwheel start-less]]
             [compojure.core :refer [GET PUT POST defroutes]]
@@ -11,8 +12,44 @@
             [ring.middleware.edn :refer [wrap-edn-params]]
             [environ.core :refer [env]]
 ;            [ring.adapter.jetty :refer [run-jetty]]
-            [org.httpkit.server :as hk])
+            [org.httpkit.server :as hk]
+            [taoensso.sente :as sente]
+            [taoensso.sente.server-adapters.http-kit :refer [sente-web-server-adapter]])
   (:gen-class))
+
+(let [{:keys [ch-recv send-fn ajax-post-fn ajax-get-or-ws-handshake-fn connected-uids]}
+      (sente/make-channel-socket! sente-web-server-adapter {})]
+  (def ring-ajax-post (fn [req]
+                        (println "got POST:")
+                        (println req)
+                        (ajax-post-fn req)))
+  (def ring-ajax-get-or-ws-handshake ajax-get-or-ws-handshake-fn)
+  (def ch-chsk ch-recv)
+  (def chsk-send! send-fn)
+  (def connected-uids connected-uids))
+(defonce router (atom nil))
+
+(defn event-msg-handler
+  [{:keys [event id ?data ?reply-fn]}]
+  (println "got sente router request =====")
+  (when ?reply-fn
+    (?reply-fn {:reply-data "reply-data"})))
+
+(defn stop-router!
+  []
+  (when-let [stop-f @router]
+    (stop-f)))
+
+(defn start-router!
+  []
+  (stop-router!)
+  (reset! router
+          (sente/start-chsk-router! ch-chsk event-msg-handler)))
+
+(comment (go-loop [d (<! ch-chsk)]
+   (println "server go message!")
+   (println d)
+   (recur (<! ch-chsk))))
 
 (deftemplate page (io/resource "index.html") []
   [:body] (if is-dev? inject-devmode-html identity))
@@ -44,6 +81,8 @@
   (PUT "/services" {params :params} (service-update params))
   (resources "/")
   (resources "/react" {:root "react"})
+  (GET "/chsk" req (ring-ajax-get-or-ws-handshake req))
+  (POST "/chsk" req (ring-ajax-post req))
   (GET "/*" req (page)))
 
 (defn get-dev-handler []
@@ -64,6 +103,8 @@
 
 (defn run-web-server [& [port]]
   (let [port (Integer. (or port (env :port) 10555))]
+    (println "starting sente router")
+    (start-router!)
     (println (format "Starting web server on port %d." port))
 ;    (run-jetty http-handler {:port port :join? false})
     (hk/run-server http-handler {:port port})))

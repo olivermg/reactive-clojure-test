@@ -1,6 +1,6 @@
 (ns manager-web.core
-  (:require-macros [cljs.core.async.macros :refer [go]])
-  (:require [cljs.core.async :as async :refer [put! chan alts!]]
+  (:require-macros [cljs.core.async.macros :refer [go go-loop]])
+  (:require [cljs.core.async :as async :refer [<! >! put! chan alts!]]
             [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
             [om-sync.core :refer [om-sync]]
@@ -10,6 +10,7 @@
             [om-bootstrap.random :as rnd]
             [om-bootstrap.grid :as grid]
             [om-bootstrap.panel :as panel]
+            [taoensso.sente :as sente :refer [cb-success?]]
 ;            [cljs.reader :as reader]
 ;            [goog.events :as events]
             )
@@ -26,6 +27,22 @@
                           :data [{:value 24000 :timestamp "2015-07-01"}
                                  {:value 10000 :timestamp "2015-07-20"}]
                           :services {}}))
+
+;;
+;; ==========================
+;;
+
+(let [{:keys [chsk ch-recv send-fn state]}
+      (sente/make-channel-socket! "/chsk" {:type :auto})]
+  (def chsk chsk)
+  (def ch-chsk ch-recv)
+  (def chsk-send! send-fn)
+  (def chsk-state state))
+
+(comment (go-loop [d (<! ch-chsk)]
+   (println "got message!")
+   (println d)
+   (recur (<! ch-chsk))))
 
 ;;
 ;; ==========================
