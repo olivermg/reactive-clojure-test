@@ -49,6 +49,8 @@
 ;; ==========================
 ;;
 
+(def sync-ch (chan))
+
 (defn editable-input
   [state owner {:keys [key type label placeholder]}]
   (reify
@@ -62,20 +64,25 @@
                                :placeholder placeholder
                                :onChange (fn [e])
                                :onBlur (fn [e]
-                                         (om/transact! state key
-                                                       #(.. e -target -value)))})))))
+                                         (let [newval (.. e -target -value)]
+                                           (put! sync-ch (str "a message: " newval))
+                                           (om/transact! state key (fn [] newval))))})))))
 
-(defn server-synced-view
-  [state owner]
+(defn synced-view
+  [state owner {:keys [view channel] :as opts}]
   (reify
+    om/IWillMount
+    (will-mount [_]
+      (go-loop [msg (<! channel)]
+        (println "got sync message:")
+        (println owner)
+        (println state)
+        (println msg)
+        (println "===")
+        (recur (<! channel))))
     om/IRender
     (render [_]
-      (dom/input #js {:type "text" :value (:value state)
-                      :onChange (fn [e])
-                      :onBlur (fn [e]
-                                (om/transact! state :value
-                                              (fn [_]
-                                                (.. e -target -value))))}))))
+      (om/build view state {:opts opts}))))
 
 ;;
 ;; ==========================
@@ -184,9 +191,22 @@
                (om/build editable-input
                          (-> app :server-state :input1)
                          {:opts {:key :value
+                                 :type "checkbox"
+                                 :label "check1"}})
+               (om/build editable-input
+                         (-> app :server-state :input1)
+                         {:opts {:key :value
                                  :type "text"
                                  :label "text2"
                                  :placeholder "placeholder2"}})
+               (om/build synced-view
+                         (-> app :server-state :input1)
+                         {:opts {:view editable-input
+                                 :channel sync-ch
+                                 :key :value
+                                 :type "text"
+                                 :label "synced1"
+                                 :placeholder "placeholder3"}})
                (when err-msg
                  (dom/div nil err-msg))))))
 
