@@ -23,7 +23,8 @@
                  [fogus/ring-edn "0.3.0"]
                  [com.novemberain/monger "3.0.0"]
                  [com.taoensso/sente "1.5.0"]
-                 [http-kit "2.1.19"]]
+                 [http-kit "2.1.19"]
+                 [com.cemerick/friend "0.2.2-SNAPSHOT"]]
 
   :plugins [[lein-cljsbuild "1.0.5"]
             [lein-environ "1.0.0"]

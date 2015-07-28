@@ -14,7 +14,10 @@
 ;            [ring.adapter.jetty :refer [run-jetty]]
             [org.httpkit.server :as hk]
             [taoensso.sente :as sente]
-            [taoensso.sente.server-adapters.http-kit :refer [sente-web-server-adapter]])
+            [taoensso.sente.server-adapters.http-kit :refer [sente-web-server-adapter]]
+            [cemerick.friend :as friend]
+            [cemerick.friend.workflows :as workflows]
+            [cemerick.friend.credentials :as creds])
   (:gen-class))
 
 (let [{:keys [ch-recv send-fn ajax-post-fn ajax-get-or-ws-handshake-fn connected-uids]}
@@ -79,6 +82,7 @@
   (GET "/services" [] (services))
   (POST "/services" {params :params} (service-create params))
   (PUT "/services" {params :params} (service-update params))
+  (POST "/login" req (println "login!"))
   (resources "/")
   (resources "/react" {:root "react"})
   (GET "/chsk" req (ring-ajax-get-or-ws-handshake req))

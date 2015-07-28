@@ -26,7 +26,8 @@
                           :view {:selected :table}
                           :data [{:value 24000 :timestamp "2015-07-01"}
                                  {:value 10000 :timestamp "2015-07-20"}]
-                          :services {}}))
+                          :services {}
+                          :server-state {:input1 {:value 123}}}))
 
 ;;
 ;; ==========================
@@ -43,6 +44,38 @@
    (println "got message!")
    (println d)
    (recur (<! ch-chsk))))
+
+;;
+;; ==========================
+;;
+
+(defn editable-input
+  [state owner {:keys [key type label placeholder]}]
+  (reify
+    om/IRender
+    (render [_]
+      (dom/div nil
+               (when label
+                 (dom/label nil label))
+               (dom/input #js {:type type
+                               :value (key state)
+                               :placeholder placeholder
+                               :onChange (fn [e])
+                               :onBlur (fn [e]
+                                         (om/transact! state key
+                                                       #(.. e -target -value)))})))))
+
+(defn server-synced-view
+  [state owner]
+  (reify
+    om/IRender
+    (render [_]
+      (dom/input #js {:type "text" :value (:value state)
+                      :onChange (fn [e])
+                      :onBlur (fn [e]
+                                (om/transact! state :value
+                                              (fn [_]
+                                                (.. e -target -value))))}))))
 
 ;;
 ;; ==========================
@@ -142,6 +175,18 @@
                                    (reset! app-state (:old-state tx-data))
                                    (om/set-state! owner :err-msg
                                                   "Oops!"))}})
+               (om/build editable-input
+                         (-> app :server-state :input1)
+                         {:opts {:key :value
+                                 :type "text"
+                                 :label "text1"
+                                 :placeholder "placeholder1"}})
+               (om/build editable-input
+                         (-> app :server-state :input1)
+                         {:opts {:key :value
+                                 :type "text"
+                                 :label "text2"
+                                 :placeholder "placeholder2"}})
                (when err-msg
                  (dom/div nil err-msg))))))
 
