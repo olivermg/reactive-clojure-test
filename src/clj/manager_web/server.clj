@@ -34,9 +34,13 @@
 
 (defn event-msg-handler
   [{:keys [event id ?data ?reply-fn]}]
-  (println "got sente router request =====")
-  (when ?reply-fn
-    (?reply-fn {:reply-data "reply-data"})))
+  (let [name (name id)
+        namespace (namespace id)]
+    (when (= namespace "sync")
+      (println "got sente router request =====")
+      (println (str "event: " event ", id: " id ", data: " ?data))
+      (when ?reply-fn
+        (?reply-fn {:reply-data "reply-data"})))))
 
 (defn stop-router!
   []

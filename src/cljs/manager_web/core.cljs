@@ -74,11 +74,11 @@
     om/IWillMount
     (will-mount [_]
       (go-loop [msg (<! channel)]
-        (println "got sync message:")
-        (println owner)
-        (println state)
-        (println msg)
-        (println "===")
+        (chsk-send! [:sync/view {:data "aaa"}]
+                    10000
+                    (fn [d]
+                      (println "sente reply")
+                      (println d)))
         (recur (<! channel))))
     om/IRender
     (render [_]
