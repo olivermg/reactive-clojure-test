@@ -1,5 +1,6 @@
 (ns manager-web.core
-  (:require-macros [cljs.core.async.macros :refer [go go-loop]])
+  (:require-macros [cljs.core.async.macros :refer [go go-loop]]
+                   [manager-web.core-macros :refer [make-grid]])
   (:require [cljs.core.async :as async :refer [<! >! put! chan alts!]]
             [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
@@ -10,6 +11,7 @@
             [om-bootstrap.random :as rnd]
             [om-bootstrap.grid :as grid]
             [om-bootstrap.panel :as panel]
+            [om-bootstrap.input :as inp]
             [taoensso.sente :as sente :refer [cb-success?]]
 ;            [cljs.reader :as reader]
 ;            [goog.events :as events]
@@ -51,22 +53,21 @@
 
 (def sync-ch (chan))
 
-(defn editable-input
-  [state owner {:keys [key type label placeholder]}]
+(defn editable-text-input
+  [state owner {:keys [key label placeholder help]}]
   (reify
     om/IRender
     (render [_]
-      (dom/div nil
-               (when label
-                 (dom/label nil label))
-               (dom/input #js {:type type
-                               :value (key state)
-                               :placeholder placeholder
-                               :onChange (fn [e])
-                               :onBlur (fn [e]
-                                         (let [newval (.. e -target -value)]
-                                           (put! sync-ch (str "a message: " newval))
-                                           (om/transact! state key (fn [] newval))))})))))
+      (inp/input {:type "text"
+                  :value (key state)
+                  :label label
+                  :placeholder placeholder
+                  :help help
+                  :onChange (fn [e])
+                  :onBlur (fn [e]
+                            (let [newval (.. e -target -value)]
+                              (put! sync-ch (str "a message: " newval))
+                              (om/transact! state key (fn [] newval))))}))))
 
 (defn synced-view
   [state owner {:keys [view channel] :as opts}]
@@ -83,6 +84,40 @@
     om/IRender
     (render [_]
       (om/build view state {:opts opts}))))
+
+(defn grid-view
+  [state owner]
+  (reify
+    om/IRender
+    (render [_]
+      (grid/grid {}
+                 (grid/row {}
+                           (grid/col {:xs 12 :md 8}
+                                     "11111"
+                                     (om/build editable-text-input
+                                               (-> state :server-state :input1)
+                                               {:opts {:key :value
+                                                       :label "text1"
+                                                       :placeholder "placeholder1"
+                                                       :help "help1"}})
+                                     (om/build editable-text-input
+                                               (-> state :server-state :input1)
+                                               {:opts {:key :value
+                                                       :label "text2"
+                                                       :placeholder "placeholder2"
+                                                       :help "help2"}})
+                                     )
+                           (grid/col {:xs 12 :md 4}
+                                     "22222"
+                                     (om/build synced-view
+                                               (-> state :server-state :input1)
+                                               {:opts {:view editable-text-input
+                                                       :channel sync-ch
+                                                       :key :value
+                                                       :label "synced1"
+                                                       :placeholder "placeholder3"
+                                                       :help "help3"}})
+                                     ))))))
 
 ;;
 ;; ==========================
@@ -182,31 +217,7 @@
                                    (reset! app-state (:old-state tx-data))
                                    (om/set-state! owner :err-msg
                                                   "Oops!"))}})
-               (om/build editable-input
-                         (-> app :server-state :input1)
-                         {:opts {:key :value
-                                 :type "text"
-                                 :label "text1"
-                                 :placeholder "placeholder1"}})
-               (om/build editable-input
-                         (-> app :server-state :input1)
-                         {:opts {:key :value
-                                 :type "checkbox"
-                                 :label "check1"}})
-               (om/build editable-input
-                         (-> app :server-state :input1)
-                         {:opts {:key :value
-                                 :type "text"
-                                 :label "text2"
-                                 :placeholder "placeholder2"}})
-               (om/build synced-view
-                         (-> app :server-state :input1)
-                         {:opts {:view editable-input
-                                 :channel sync-ch
-                                 :key :value
-                                 :type "text"
-                                 :label "synced1"
-                                 :placeholder "placeholder3"}})
+               (om/build grid-view app)
                (when err-msg
                  (dom/div nil err-msg))))))
 

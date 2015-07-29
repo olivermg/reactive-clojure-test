@@ -68,7 +68,9 @@
 
 (defn init []
   (generate-response {:services {:url "/services"
-                                 :coll (vec (db/get-services))}}))
+                                 ;:coll (vec (db/get-services))
+                                 :coll [{:id 1 :name "111"} {:id 2 :name "222"}]
+                                 }}))
 
 (defn services []
   (generate-response (db/get-services)))
