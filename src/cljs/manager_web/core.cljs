@@ -31,6 +31,14 @@
                           :services {}
                           :server-state {:input1 {:value 123}}}))
 
+(defonce man-app-state (atom {:services [{:id 111 :enabled false}
+                                         {:id 222 :enabled true}
+                                         {:id 333 :enabled true}
+                                         {:id 444 :enabled false}
+                                         {:id 555 :enabled true}
+                                         {:id 666 :enabled true}
+                                         {:id 777 :enabled false}]}))
+
 ;;
 ;; ==========================
 ;;
@@ -118,6 +126,44 @@
                                                        :placeholder "placeholder3"
                                                        :help "help3"}})
                                      ))))))
+
+(defn man-service-view
+  [service owner]
+  (reify
+    om/IRender
+    (render [_]
+      (panel/panel {:header (:id service)
+                    :bs-style (if (:enabled service)
+                                "success"
+                                "warning")}
+                   "service"))))
+
+(defn man-services-view
+  [services owner]
+  (reify
+    om/IRender
+    (render [_]
+      (dom/div nil
+               (map #(grid/col {:xs 12 :md 6 :lg 3}
+                               (om/build man-service-view %))
+                    (:services services))))))
+
+(defn man-app-view
+  [state owner]
+  (reify
+    om/IRender
+    (render [_]
+      (dom/div nil
+               (rnd/page-header {}
+                                "Header"
+                                (dom/small nil "Subheader"))
+               (grid/grid {}
+                          (grid/row {}
+                                    (grid/col {:xs 12 :md 4}
+                                              "Actions")
+                                    (grid/col {:xs 12 :md 8}
+                                              (om/build man-services-view
+                                                        state))))))))
 
 ;;
 ;; ==========================
@@ -221,20 +267,20 @@
                (when err-msg
                  (dom/div nil err-msg))))))
 
-(let [tx-chan (chan)
-      tx-pub-chan (async/pub tx-chan (fn [_] :txs))]
-  (edn-xhr
-   {:method :get
-    :url "/init"
-    :on-complete
-    (fn [res]
-;      (reset! app-state res)
-      (swap! app-state #(assoc % :services (:services res)))
-      (om/root app-view app-state
-               {:target (.getElementById js/document "services")
-                :shared {:tx-chan tx-pub-chan}
-                :tx-listen (fn [tx-data root-cursor]
-                             (put! tx-chan [tx-data root-cursor]))}))}))
+(comment (let [tx-chan (chan)
+               tx-pub-chan (async/pub tx-chan (fn [_] :txs))]
+           (edn-xhr
+            {:method :get
+             :url "/init"
+             :on-complete
+             (fn [res]
+                                        ;      (reset! app-state res)
+               (swap! app-state #(assoc % :services (:services res)))
+               (om/root app-view app-state
+                        {:target (.getElementById js/document "services")
+                         :shared {:tx-chan tx-pub-chan}
+                         :tx-listen (fn [tx-data root-cursor]
+                                      (put! tx-chan [tx-data root-cursor]))}))})))
 
 ;;
 ;; =================
@@ -289,36 +335,40 @@
 
 (defn main []
 
-  (om/root
-   (fn [app owner]
-     (reify
-       om/IRender
-       (render [_]
-         (rnd/page-header {} "Manager console"))))
-   app-state
-   {:target (. js/document (getElementById "app1"))})
+  (comment (om/root
+            (fn [app owner]
+              (reify
+                om/IRender
+                (render [_]
+                  (rnd/page-header {} "Manager console"))))
+            app-state
+            {:target (. js/document (getElementById "app1"))})
 
-  (om/root
-   (fn [app owner]
-     (reify
-       om/IRender
-       (render [_]
-         (grid/grid {}
-                    (grid/row {}
-                              (grid/col {:xs 12 :md 8} (buttons))
-                              (grid/col {:xs 6 :md 4} "col 2"))))))
-   app-state
-   {:target (. js/document (getElementById "app2"))})
+           (om/root
+            (fn [app owner]
+              (reify
+                om/IRender
+                (render [_]
+                  (grid/grid {}
+                             (grid/row {}
+                                       (grid/col {:xs 12 :md 8} (buttons))
+                                       (grid/col {:xs 6 :md 4} "col 2"))))))
+            app-state
+            {:target (. js/document (getElementById "app2"))})
 
-  (om/root
-   (fn [app owner]
-     (reify
-       om/IRender
-       (render [_]
-         (grid/grid {}
-                    (grid/row {}
-                              (grid/col {:xs 12}
-                                        (om/build toggle (:view app))
-                                        (om/build view app)))))))
-   app-state
-   {:target (. js/document (getElementById "app3"))}))
+           (om/root
+            (fn [app owner]
+              (reify
+                om/IRender
+                (render [_]
+                  (grid/grid {}
+                             (grid/row {}
+                                       (grid/col {:xs 12}
+                                                 (om/build toggle (:view app))
+                                                 (om/build view app)))))))
+            app-state
+            {:target (. js/document (getElementById "app3"))}))
+
+  (om/root man-app-view
+           man-app-state
+           {:target (.getElementById js/document "man-app")}))

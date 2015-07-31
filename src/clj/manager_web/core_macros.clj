@@ -1,5 +1,6 @@
 (ns manager-web.core-macros
-  (:require [om-bootstrap.grid :as grid]))
+;  (:require [om-bootstrap.grid :as grid])
+  )
 
 ;;
 ;; use it like this:
