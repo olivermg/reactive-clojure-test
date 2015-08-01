@@ -127,6 +127,31 @@
                                                        :help "help3"}})
                                      ))))))
 
+(defn add-service
+  [state id enabled]
+  (om/transact! state :services #(conj % {:id id :enabled enabled})))
+
+(defn man-actions-view
+  [state owner]
+  (reify
+    om/IInitState
+    (init-state [_]
+      {:aaa 111})
+    om/IRender
+    (render [_]
+      (btn/dropdown {:bs-style "primary"
+                     :title "Add service"}
+                    (btn/menu-item {:key :nginx
+                                    :on-select #(add-service state 888 false)}
+                                   "nginx")
+                    (btn/menu-item {:key :apache
+                                    :on-select #(add-service state 999 false)}
+                                   "apache")
+                    (btn/menu-item {:key :mysql
+                                    :on-select #(add-service state 1111 false)}
+                                   "mysql")
+                    ))))
+
 (defn man-service-view
   [service owner]
   (reify
@@ -160,7 +185,8 @@
                (grid/grid {}
                           (grid/row {}
                                     (grid/col {:xs 12 :md 4}
-                                              "Actions")
+                                              (om/build man-actions-view
+                                                        state))
                                     (grid/col {:xs 12 :md 8}
                                               (om/build man-services-view
                                                         state))))))))
