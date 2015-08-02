@@ -128,8 +128,12 @@
                                      ))))))
 
 (defn add-service
-  [state id enabled]
-  (om/transact! state :services #(conj % {:id id :enabled enabled})))
+  [services id enabled]
+  (om/transact! services :services #(conj % {:id id :enabled enabled})))
+
+(defn toggle-enabled
+  [service]
+  (om/transact! service :enabled not))
 
 (defn man-actions-view
   [state owner]
@@ -160,7 +164,9 @@
       (panel/panel {:header (:id service)
                     :bs-style (if (:enabled service)
                                 "success"
-                                "warning")}
+                                "warning")
+                    :on-click (fn [e]
+                                (toggle-enabled service))}
                    "service"))))
 
 (defn man-services-view
