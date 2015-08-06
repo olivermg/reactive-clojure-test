@@ -1,6 +1,7 @@
 (ns manager-web.server
   (:require [clojure.core.async :as async :refer [<! >! put! chan alts! go go-loop]]
             [manager-web.db :as db]
+            [manager-web.mq :as mq]
             [clojure.java.io :as io]
             [manager-web.dev :refer [is-dev? inject-devmode-html browser-repl start-figwheel start-less]]
             [compojure.core :refer [GET PUT POST defroutes]]
@@ -83,12 +84,16 @@
   (println (str "received update request: " data))
   {:status 501})
 
+(defn publish-message [req topic msg]
+  ((:mq-publish-fn req) topic msg))
+
 (defroutes routes
   (GET "/init" [] (init))
   (GET "/services" [] (services))
   (POST "/services" {params :params} (service-create params))
   (PUT "/services" {params :params} (service-update params))
   (POST "/login" req (println "login!"))
+  (GET "/mq" req (publish-message req "logs" "a message"))
   (resources "/")
   (resources "/react" {:root "react"})
   (GET "/chsk" req (ring-ajax-get-or-ws-handshake req))
@@ -99,6 +104,9 @@
   (-> routes
       (wrap-defaults (assoc site-defaults :security false))
       wrap-edn-params
+      (mq/wrap-mq {:hostname "localhost"} [["logs"
+                                            (fn [ch meta payload] (println "1:message"))
+                                            (fn [ch meta payload] (println "2:message"))]])
       reload/wrap-reload))
 
 (defn get-production-handler []
