@@ -22,6 +22,7 @@
                  [sablono "0.3.4"]
                  [fogus/ring-edn "0.3.0"]
                  [com.novemberain/monger "3.0.0"]
+                 [com.novemberain/langohr "3.3.0"]
                  [com.taoensso/sente "1.5.0"]
                  [http-kit "2.1.19"]
                  [com.cemerick/friend "0.2.2-SNAPSHOT"]]
