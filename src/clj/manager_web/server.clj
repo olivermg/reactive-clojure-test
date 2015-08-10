@@ -2,6 +2,7 @@
   (:require [clojure.core.async :as async :refer [<! >! put! chan alts! go go-loop]]
             [manager-web.db :as db]
             [manager-web.mq :as mq]
+            [manager-web.auth :as auth]
             [clojure.java.io :as io]
             [manager-web.dev :refer [is-dev? inject-devmode-html browser-repl start-figwheel start-less]]
             [compojure.core :refer [GET PUT POST defroutes]]
@@ -98,7 +99,8 @@
   (GET "/services" [] (services))
   (POST "/services" {params :params} (service-create params))
   (PUT "/services" {params :params} (service-update params))
-  (POST "/login" req (println "login!"))
+  (GET "/protected" req (friend/authorize #{:manager-web.auth/admin} "PROTECTED PAGE"))
+;  (POST "/login" req (println "login!"))
 ;  (GET "/mq" req (publish-message req "logs" "a message"))
   (resources "/")
   (resources "/react" {:root "react"})
@@ -108,6 +110,12 @@
 
 (defn get-dev-handler []
   (-> routes
+      (friend/authenticate {:credential-fn (fn [req]
+                                             (println "got login: ")
+                                             (println req)
+;                                             (partial creds/bcrypt-credential-fn auth/users)
+                                             (creds/bcrypt-credential-fn auth/users req))
+                            :workflows [(workflows/interactive-form)]})
       (wrap-defaults (assoc site-defaults :security false))
       wrap-edn-params
       (mq/wrap-mq {:hostname "localhost"} [["logs"
