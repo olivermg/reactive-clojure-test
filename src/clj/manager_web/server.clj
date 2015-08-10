@@ -21,25 +21,34 @@
             [cemerick.friend.credentials :as creds])
   (:gen-class))
 
+(defn publish-message [req topic msg]
+  ((:mq-publish-fn req) topic msg))
+
 (let [{:keys [ch-recv send-fn ajax-post-fn ajax-get-or-ws-handshake-fn connected-uids]}
       (sente/make-channel-socket! sente-web-server-adapter {})]
   (def ring-ajax-post (fn [req]
-                        (println "got POST:")
+                        (println "got SENTE POST:")
                         (println req)
                         (ajax-post-fn req)))
-  (def ring-ajax-get-or-ws-handshake ajax-get-or-ws-handshake-fn)
+  (def ring-ajax-get-or-ws-handshake (fn [req]
+                                       (println "got SENTE GET:")
+                                       (println req)
+                                       (ajax-get-or-ws-handshake-fn req)))
   (def ch-chsk ch-recv)
   (def chsk-send! send-fn)
   (def connected-uids connected-uids))
 (defonce router (atom nil))
 
 (defn event-msg-handler
-  [{:keys [event id ?data ?reply-fn]}]
+  [{:keys [event id ?data ?reply-fn] :as req}]
   (let [name (name id)
         namespace (namespace id)]
     (when (= namespace "sync")
       (println "got sente router request =====")
+      (println req)
       (println (str "event: " event ", id: " id ", data: " ?data))
+      (when (= name "add-service")
+        (publish-message (:ring-req req) "logs" "mq message received via sente!"))
       (when ?reply-fn
         (?reply-fn {:reply-data "reply-data"})))))
 
@@ -84,16 +93,13 @@
   (println (str "received update request: " data))
   {:status 501})
 
-(defn publish-message [req topic msg]
-  ((:mq-publish-fn req) topic msg))
-
 (defroutes routes
   (GET "/init" [] (init))
   (GET "/services" [] (services))
   (POST "/services" {params :params} (service-create params))
   (PUT "/services" {params :params} (service-update params))
   (POST "/login" req (println "login!"))
-  (GET "/mq" req (publish-message req "logs" "a message"))
+;  (GET "/mq" req (publish-message req "logs" "a message"))
   (resources "/")
   (resources "/react" {:root "react"})
   (GET "/chsk" req (ring-ajax-get-or-ws-handshake req))

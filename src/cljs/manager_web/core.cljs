@@ -55,6 +55,12 @@
    (println d)
    (recur (<! ch-chsk))))
 
+(defn sente-post
+  [id msg cb]
+  (chsk-send! [id {:data msg}]
+              10000
+              cb))
+
 ;;
 ;; ==========================
 ;;
@@ -146,7 +152,10 @@
       (btn/dropdown {:bs-style "primary"
                      :title "Add service"}
                     (btn/menu-item {:key :nginx
-                                    :on-select #(add-service state 888 false)}
+                                    :on-select (fn [e]
+                                                 (add-service state 888 false)
+                                                 (sente-post :sync/add-service "add service nginx!"
+                                                             #(println "got cb invocation!")))}
                                    "nginx")
                     (btn/menu-item {:key :apache
                                     :on-select #(add-service state 999 false)}
